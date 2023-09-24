@@ -6,25 +6,16 @@
 #include <math.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <limits.h>
 #include <float.h>
-#include <errno.h>
+#include <pthread.h>
 
-// Print out an error message and exit.
-static void fail(char const *message)
-{
-  fprintf(stderr, "%s\n", message);
-  exit(1);
-}
-
-// Print out a usage message, then exit.
-static void usage()
-{
-  printf("usage: short <workers>\n");
-  printf("       short <workers> report\n");
-  exit(1);
-}
+typedef struct {
+  int workers;
+  int index;
+  float minValue;
+  bool report;
+} WorkerInfo;
 
 // Maximum width of each basis vector.
 #define DMAX 100
@@ -43,6 +34,21 @@ int bCount = 0;
 
 // Current capacity of the basis array
 int bCap = 0;
+
+// Print out an error message and exit.
+static void fail(char const *message)
+{
+  fprintf(stderr, "%s\n", message);
+  exit(1);
+}
+
+// Print out a usage message, then exit.
+static void usage()
+{
+  printf("usage: short <workers>\n");
+  printf("       short <workers> report\n");
+  exit(1);
+}
 
 // Read the input list of basis vectors.
 void readBasis()
@@ -85,44 +91,26 @@ float vecSumMag(int x, int y, int z)
   return sqrt(sum);
 }
 
-void handleChild(int pipefd[2], int index, int workers, bool report)
+void *vecWorker(WorkerInfo *info)
 {
-  // Close reading end of pipe
-  close(pipefd[0]);
-
-  // Initialize to maximum value
-  float minMag = FLT_MAX;
-
   // Use index value to iterate over this worker's assigned set of starting basis
   // vectors and sum all combinations of vectors with higher index
-  for (int i = index; i < bCount - 2; i += workers) {
+  for (int i = info->index; i < bCount - 2; i += info->workers) {
     for (int j = i + 1; j < bCount - 1; j++) {
       for (int k = j + 1; k < bCount; k++) {
         float mag = vecSumMag(i, j, k);
 
         // Print report value if specified
-        if (report) {
-          printf("%d : | B[%d] + B[%d] + B[%d] | = %.3f\n", index, i, j, k,
-                 mag);
-        } 
+        if (info->report) {
+          printf("%d : | B[%d] + B[%d] + B[%d] | = %.3f\n", info->index, i, j,
+                 k, mag);
+        }
 
         // Replace minimum value if necessary
-        minMag = fmin(minMag, mag);
+        info->minValue = fmin(info->minValue, mag);
       }
     }
   }
-
-  // Lock write end of pipe
-  lockf(pipefd[1], F_LOCK, 0);
-  // Write the float to the buffer
-  write(pipefd[1], &minMag, sizeof(float));
-  // Release the lock
-  lockf(pipefd[1], F_ULOCK, 0);
-
-  // Release resources and exit
-  close(pipefd[1]);
-  free(basis);
-  exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[])
@@ -146,44 +134,35 @@ int main(int argc, char *argv[])
 
   readBasis();
 
-  // Create pipe
-  int pipefd[2];
-  pipe(pipefd);
+  // Create a list to hold the pthread type for each worker
+  pthread_t threads[workers];
+  // And another for their corresponding info structs
+  WorkerInfo infos[workers];
 
   for (int i = 0; i < workers; i++) {
-    pid_t pid = fork();
+    infos[i].index = i;
+    infos[i].minValue = FLT_MAX;
+    infos[i].workers = workers;
+    infos[i].report = report;
 
-    // Handle failed fork
-    if (pid < 0)
-      return EXIT_FAILURE;
-    // In child: move to calculations
-    if (pid == 0)
-      handleChild(pipefd, i, workers, report);
+    // Create new thread from info; if return != 0 creation failed
+    if (pthread_create(&threads[i], NULL, vecWorker, NULL))
+      fail("Thread creation failed");
   }
 
-  // Still the parent: close write pipe
-  close(pipefd[1]);
-
   // Wait on children and track lowest magnitude value
-  float minMag = DBL_MAX;
+  float minMag = FLT_MAX;
   for (int i = 0; i < workers; i++) {
-    // Handle failure while waiting for child
-    if (wait(NULL) < 0)
-      return EXIT_FAILURE;
-
-    // Read from pipe into float, exiting if less bytes are read
-    float mag;
-    if (read(pipefd[0], &mag, sizeof(float)) < sizeof(float))
-      return EXIT_FAILURE;
+    // Wait for thread to exit; return value not needed
+    pthread_join(threads[i], NULL);
 
     // Update minimum value if needed
-    minMag = fmin(minMag, mag);
+    minMag = fmin(minMag, infos[i].minValue);
   }
 
   printf("Shortest Vector: %.3f\n", minMag);
 
   // Release resources and exit
-  close(pipefd[0]);
   free(basis);
   return EXIT_SUCCESS;
 }
