@@ -10,20 +10,20 @@
 #include "common.h"
 
 // Print out an error message and exit.
-static void fail( char const *message ) {
-  fprintf( stderr, "%s\n", message );
-  exit( 1 );
+static void fail(char const *message)
+{
+  fprintf(stderr, "%s\n", message);
+  exit(1);
 }
 
 // Print out a usage message and exit.
-static void usage() {
-  fprintf( stderr, "usage: reset <registration-file>\n" );
-  exit( 1 );
+static void usage()
+{
+  fprintf(stderr, "usage: reset <registration-file>\n");
+  exit(1);
 }
 
-int main( int argc, char *argv[] ) {
-
-
-
+int main(int argc, char *argv[])
+{
   return 0;
 }

@@ -10,14 +10,13 @@
 #include "common.h"
 
 // Print out an error message and exit.
-static void fail( char const *message ) {
-  fprintf( stderr, "%s\n", message );
-  exit( 1 );
+static void fail(char const *message)
+{
+  fprintf(stderr, "%s\n", message);
+  exit(1);
 }
 
-int main( int argc, char *argv[] ) {
-
-
-
+int main(int argc, char *argv[])
+{
   return 0;
 }
