@@ -127,5 +127,6 @@ int main(int argc, char *argv[])
     printf("error\n");
   }
 
+  shmdt(regBuffer);
   return EXIT_SUCCESS;
 }
