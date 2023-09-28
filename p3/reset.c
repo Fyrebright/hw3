@@ -10,28 +10,34 @@
 #include "common.h"
 
 // Print out an error message and exit.
-static void fail(char const *message)
+static void fail(char const *message, const bool printErrno)
 {
   fprintf(stderr, "%s\n", message);
-  fprintf(stderr, "errno: %d\n", errno);
-  exit(1);
+
+  // Optionally print errno
+  if(printErrno)
+    fprintf(stderr, "errno: %d\n", errno);
+  
+  exit(EXIT_FAILURE);
 }
 
 // Print out a usage message and exit.
 static void usage()
 {
   fprintf(stderr, "usage: reset <registration-file>\n");
-  exit(1);
+  exit(EXIT_FAILURE);
 }
 
 void loadRegistration(const char *filename, RegState *reg)
 {
   FILE *regFile = fopen(filename, "r");
+  if(regFile == NULL) 
+    fail("Invalid input file: bad-filename",false);
 
   // Iterate over ROW_MAX days in file
   for (int i = 0; i < ROW_MAX; i++) {
     // Remove day and whitespace from beginning of line and put into RegState
-    fscanf(regFile, " %10s ", reg->dayNames[i]);
+    fscanf(regFile, " %s ", reg->dayNames[i]);
 
     // Iterate over COL_MAX hours
     for (int j = 0; j <= COL_MAX; j++) {
@@ -58,12 +64,12 @@ int main(int argc, char *argv[])
   // Set read/write permissions with 0666
   int shmId = shmget(shmToken, sizeof(RegState) + 1, IPC_CREAT | 0666);
   if (shmId == -1)
-    fail("Error allocating shared memory for RegState:");
+    fail("Error allocating shared memory for RegState:",false);
 
   // Attach shared memory and assign pointer to it
   void *smBuffer = shmat(shmId, NULL, 0);
   if ( smBuffer == (char *) -1 )
-    fail( "Attaching shared memory failed:" );
+    fail( "Attaching shared memory failed:",false );
 
   // Read registration struct into shared memory
   memcpy(smBuffer,(void* ) &reg, sizeof(RegState));

@@ -10,10 +10,15 @@
 #include "common.h"
 
 // Print out an error message and exit.
-static void fail(char const *message)
+static void fail(char const *message, const bool printErrno)
 {
   fprintf(stderr, "%s\n", message);
-  exit(1);
+
+  // Optionally print errno
+  if(printErrno)
+    fprintf(stderr, "errno: %d\n", errno);
+  
+  exit(EXIT_FAILURE);
 }
 
 char parseDay(char *str, RegState *reg)
@@ -57,7 +62,7 @@ void cancelEvent(const int day, const int hour, RegState *reg)
 
 void queryDay(const int day, const RegState *reg)
 {
-  printf("%s ", reg->dayNames[day]);
+  printf("%s", reg->dayNames[day]);
 
   // Print out the values for the hours
   for (int i = 0; i <= COL_MAX; i++) {
@@ -79,7 +84,7 @@ int main(int argc, char *argv[])
   key_t shmToken = ftok(ABCOSTE2_HOME, PROJ_ID);
   int shmId = shmget(shmToken, sizeof(RegState), 0);
   if (shmId == -1)
-    fail("Error getting token of shared memory");
+    fail("Error getting token of shared memory", true);
 
   // Attach shared memory and cast as a pointer to a RegState struct
   RegState *regBuffer = (RegState *)shmat(shmId, NULL, 0);
@@ -118,7 +123,9 @@ int main(int argc, char *argv[])
     registerEvent(dayVal, hourVal, regBuffer);
   } else if (strcmp(argv[1], "cancel") == 0) {
     cancelEvent(dayVal, hourVal, regBuffer);
+  } else {
+    printf("error\n");
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
