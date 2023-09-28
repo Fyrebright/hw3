@@ -91,8 +91,11 @@ float vecSumMag(int x, int y, int z)
   return sqrt(sum);
 }
 
-void *vecWorker(WorkerInfo *info)
+void *vecWorker(void *arg_info)
 {
+  // Need to cast void * to a WorkerInfo struct
+  WorkerInfo *info = arg_info;
+
   // Use index value to iterate over this worker's assigned set of starting basis
   // vectors and sum all combinations of vectors with higher index
   for (int i = info->index; i < bCount - 2; i += info->workers) {
@@ -111,6 +114,8 @@ void *vecWorker(WorkerInfo *info)
       }
     }
   }
+
+  pthread_exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[])
@@ -145,8 +150,9 @@ int main(int argc, char *argv[])
     infos[i].workers = workers;
     infos[i].report = report;
 
-    // Create new thread from info; if return != 0 creation failed
-    if (pthread_create(&threads[i], NULL, vecWorker, NULL))
+    // Create new thread, passing on info as a void pointer
+    //if return != 0 creation failed
+    if (pthread_create(&threads[i], NULL, vecWorker, (void *)&infos[i]))
       fail("Thread creation failed");
   }
 
