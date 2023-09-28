@@ -6,13 +6,14 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 #include <errno.h>
-#include <string.h>
+#include <string.h> 
 #include "common.h"
 
 // Print out an error message and exit.
 static void fail(char const *message)
 {
   fprintf(stderr, "%s\n", message);
+  fprintf(stderr, "errno: %d\n", errno);
   exit(1);
 }
 
@@ -54,15 +55,18 @@ int main(int argc, char *argv[])
   key_t shmToken = ftok(ABCOSTE2_HOME, PROJ_ID);
 
   // Allocate shared memory region for RegState
-  int shmId = shmget(shmToken, sizeof(RegState), IPC_CREAT);
+  // Set read/write permissions with 0666
+  int shmId = shmget(shmToken, sizeof(RegState) + 1, IPC_CREAT | 0666);
   if (shmId == -1)
-    fail("Error allocating shared memory for RegState");
+    fail("Error allocating shared memory for RegState:");
 
   // Attach shared memory and assign pointer to it
   void *smBuffer = shmat(shmId, NULL, 0);
+  if ( smBuffer == (char *) -1 )
+    fail( "Attaching shared memory failed:" );
 
   // Read registration struct into shared memory
-  memcpy(smBuffer, &reg, sizeof(RegState));
+  memcpy(smBuffer,(void* ) &reg, sizeof(RegState));
 
   // Release the reference to the shared memory
   shmdt(smBuffer);
